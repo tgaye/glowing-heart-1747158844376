@@ -1,0 +1,240 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Glowing Heart</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a2e;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+        }
+        #canvas-container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: center;
+            position: relative;
+        }
+        .instructions {
+            position: absolute;
+            bottom: 20px;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 14px;
+            text-align: center;
+            width: 100%;
+            pointer-events: none;
+        }
+    </style>
+
+<base target="_self">
+
+
+    </head><body><div id="canvas-container"></div>
+    <div class="instructions">Hover over the heart to make it sparkle</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/p5@1.8.0/lib/p5.js"></script>
+    <script>
+        const sketch = (p) => {
+            let heartSize;
+            let beatPhase = 0;
+            let particles = [];
+            let isHovering = false;
+            let hoverIntensity = 0;
+            let glowIntensity = 0;
+            let baseColor;
+            let pulseSpeed = 0.05;
+            let lastHoverTime = 0;
+            let canvas;
+
+            p.setup = () => {
+                canvas = p.createCanvas(p.min(p.windowWidth, 1200), p.min(p.windowHeight, 800));
+                canvas.parent('canvas-container');
+                p.colorMode(p.HSB, 360, 100, 100, 1);
+                baseColor = p.color(340, 80, 90);
+                heartSize = p.min(p.width, p.height) * 0.3;
+            };
+
+            p.draw = () => {
+                p.background(25, 30, 40);
+                
+                // Update animation phases
+                beatPhase = (beatPhase + pulseSpeed) % p.TWO_PI;
+                hoverIntensity = p.lerp(hoverIntensity, isHovering ? 1 : 0, 0.1);
+                glowIntensity = p.lerp(glowIntensity, isHovering ? 1 : 0.3, 0.05);
+                
+                // Calculate current heart size with beat animation
+                const beatFactor = 1 + p.sin(beatPhase) * 0.05;
+                const currentSize = heartSize * beatFactor * (1 + hoverIntensity * 0.1);
+                
+                // Draw the heart
+                drawHeart(p.width/2, p.height/2, currentSize, baseColor, glowIntensity);
+                
+                // Handle particles
+                updateParticles();
+                drawParticles();
+                
+                // Add new particles if hovering
+                if (isHovering && p.frameCount % 3 === 0) {
+                    addParticles(3);
+                }
+            };
+
+            function drawHeart(x, y, size, color, glow) {
+                p.push();
+                p.translate(x, y);
+                
+                // Glow effect
+                for (let i = 5; i > 0; i--) {
+                    const glowSize = size * (1 + i * 0.1 * glow);
+                    const alpha = 0.2 * glow * (1 - i/5);
+                    p.fill(p.hue(color), p.saturation(color) * 0.8, p.brightness(color), alpha);
+                    p.noStroke();
+                    drawHeartShape(0, 0, glowSize);
+                }
+                
+                // Main heart
+                p.fill(color);
+                p.noStroke();
+                drawHeartShape(0, 0, size);
+                
+                // Highlight
+                p.fill(0, 0, 100, 0.3);
+                drawHeartShape(-size * 0.1, -size * 0.1, size * 0.9);
+                
+                p.pop();
+            }
+
+            function drawHeartShape(x, y, size) {
+                p.beginShape();
+                p.vertex(x, y - size * 0.4);
+                p.bezierVertex(
+                    x + size * 0.5, y - size * 0.8,
+                    x + size * 0.9, y - size * 0.2,
+                    x, y + size * 0.6
+                );
+                p.bezierVertex(
+                    x - size * 0.9, y - size * 0.2,
+                    x - size * 0.5, y - size * 0.8,
+                    x, y - size * 0.4
+                );
+                p.endShape(p.CLOSE);
+            }
+
+            function addParticles(count) {
+                for (let i = 0; i < count; i++) {
+                    const angle = p.random(p.TWO_PI);
+                    const distance = p.random(heartSize * 0.3, heartSize * 0.6);
+                    const x = p.width/2 + p.cos(angle) * distance;
+                    const y = p.height/2 + p.sin(angle) * distance;
+                    const size = p.random(5, 15);
+                    const hue = p.random(330, 350);
+                    
+                    particles.push({
+                        x: x,
+                        y: y,
+                        size: size,
+                        baseSize: size,
+                        color: p.color(hue, 70, 90, 0.8),
+                        velocity: p.createVector(p.random(-1, 1), p.random(-1, 1)).mult(2),
+                        rotation: p.random(p.TWO_PI),
+                        rotationSpeed: p.random(-0.05, 0.05),
+                        life: 100,
+                        maxLife: 100 + p.random(50),
+                        shrinkStart: p.random(30, 70)
+                    });
+                }
+            }
+
+            function updateParticles() {
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    const part = particles[i];
+                    
+                    part.x += part.velocity.x;
+                    part.y += part.velocity.y;
+                    part.velocity.y += 0.05; // Gravity
+                    part.rotation += part.rotationSpeed;
+                    part.life--;
+                    
+                    // Size animation
+                    if (part.life < part.shrinkStart) {
+                        part.size = p.map(part.life, part.shrinkStart, 0, part.baseSize, 0);
+                    }
+                    
+                    // Remove dead particles
+                    if (part.life <= 0 || part.y > p.height + part.size) {
+                        particles.splice(i, 1);
+                    }
+                }
+            }
+
+            function drawParticles() {
+                p.push();
+                p.noStroke();
+                
+                for (const part of particles) {
+                    const alpha = p.map(part.life, part.maxLife, 0, 0.8, 0);
+                    p.fill(p.hue(part.color), p.saturation(part.color), p.brightness(part.color), alpha);
+                    
+                    p.push();
+                    p.translate(part.x, part.y);
+                    p.rotate(part.rotation);
+                    
+                    // Draw tiny heart particle
+                    p.beginShape();
+                    p.vertex(0, -part.size * 0.4);
+                    p.bezierVertex(
+                        part.size * 0.5, -part.size * 0.8,
+                        part.size * 0.9, -part.size * 0.2,
+                        0, part.size * 0.6
+                    );
+                    p.bezierVertex(
+                        -part.size * 0.9, -part.size * 0.2,
+                        -part.size * 0.5, -part.size * 0.8,
+                        0, -part.size * 0.4
+                    );
+                    p.endShape(p.CLOSE);
+                    
+                    p.pop();
+                }
+                
+                p.pop();
+            }
+
+            p.mouseMoved = () => {
+                // Check if mouse is over heart
+                const d = p.dist(p.mouseX, p.mouseY, p.width/2, p.height/2);
+                isHovering = d < heartSize * 0.7;
+                
+                if (isHovering) {
+                    lastHoverTime = p.millis();
+                    // Change pulse speed based on hover
+                    pulseSpeed = p.map(d, 0, heartSize * 0.7, 0.15, 0.05, true);
+                }
+            };
+
+            p.touchMoved = () => {
+                p.mouseMoved();
+                return false; // Prevent scrolling
+            };
+
+            p.windowResized = () => {
+                p.resizeCanvas(p.min(p.windowWidth, 1200), p.min(p.windowHeight, 800));
+                heartSize = p.min(p.width, p.height) * 0.3;
+            };
+        };
+
+        new p5(sketch);
+    </script>
+
+              
+          
+                
+          
+              
+</body></html>
